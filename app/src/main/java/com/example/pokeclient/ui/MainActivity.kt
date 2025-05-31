@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -107,7 +109,12 @@ fun PokemonContent(pokemons: SnapshotStateMap<String, PokemonDetail>, paddingVal
 
     ){
         items(pokemons.toList()) { pokemon ->
-            PokemonCard(pokemon){ isShowBottomSheet ->
+            PokemonCard(
+                pokemon = pokemon,
+                cardModifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp)
+            ){ isShowBottomSheet ->
                 showBottomSheet = isShowBottomSheet
                 selectedPokemon = pokemon
             }
@@ -121,21 +128,8 @@ fun PokemonContent(pokemons: SnapshotStateMap<String, PokemonDetail>, paddingVal
             },
             sheetState = sheetState
         ) {
-            selectedPokemon?.let { (name, detail) ->
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = name.replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text("Вес: ${detail.weight}")
-                    Text("Рост: ${detail.height}")
-                    Text("Опыт: ${detail.types.size}")
-                }
+            selectedPokemon?.let { pokemon ->
+                PokemonDetailCard(pokemon)
             }
         }
     }
@@ -145,14 +139,14 @@ fun PokemonContent(pokemons: SnapshotStateMap<String, PokemonDetail>, paddingVal
 @Composable
 fun PokemonCard(
     pokemon: Pair<String, PokemonDetail>,
-    showBottomSheet: (Boolean) -> Unit
+    showName: Boolean = true,
+    cardModifier: Modifier,
+    showBottomSheet: (Boolean) -> Unit,
     ){
     val gradientColors = listOf(Color(0xFFFFF176), Color(0xFFFFB74D))
 
     Card (
-        modifier = Modifier
-            .height(250.dp)
-            .fillMaxWidth()
+        modifier = cardModifier
             .clickable {
                 showBottomSheet(true)
             }
@@ -183,11 +177,51 @@ fun PokemonCard(
                         .fillMaxSize()
                 )
             }
+            if(showName){
+                Text(
+                    text = pokemon.first.replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color(0xFF4E342E)
+                )
+            }
+        }
+    }
+}
+
+@ExperimentalMaterial3Api
+@Composable
+fun PokemonDetailCard(pokemon: Pair<String, PokemonDetail>){
+    val (name, detail) = pokemon
+
+
+    Row(
+        modifier = Modifier
+            .padding(10.dp)
+    ){
+        PokemonCard(
+            pokemon = pokemon,
+            showName = false,
+            cardModifier = Modifier
+                .size(200.dp)
+        ) { }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
             Text(
-                text = pokemon.first.replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color(0xFF4E342E)
+                text = name.replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.headlineSmall
             )
+            Spacer(Modifier.height(8.dp))
+            Text("Weight: ${detail.weight}")
+            Text("Height: ${detail.height}")
+            detail.types.forEach{
+                Text("Type: ${it.type.name}")
+            }
+            detail.stats.forEach {
+                Text("Type: ${it.stat.name}")
+            }
         }
     }
 }
