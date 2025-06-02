@@ -1,6 +1,7 @@
 package com.example.pokeclient.ui
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -17,11 +18,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
@@ -34,12 +36,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -68,6 +72,13 @@ class MainActivity : ComponentActivity() {
 fun PokemonsMainScreen(
     viewModel: MainViewModel = hiltViewModel()
 ){
+    val errorMessage by viewModel.errorMessage
+    val pokemonList = viewModel.pokemonList
+
+    LaunchedEffect (Unit){
+        viewModel.loadPokemonList()
+    }
+
     Scaffold (
         topBar = {
             TopAppBar(
@@ -82,18 +93,39 @@ fun PokemonsMainScreen(
             )
         },
         floatingActionButton = {
+            Button(
+                onClick = {
+                    viewModel.loadRandomPokemonList()
+                }
+            ) {
 
+            }
         },
         content = { paddingValues ->
-            PokemonContent(pokemons = viewModel.pokemonDetails, paddingValues)
+            errorMessage?.let {
+                Text(
+                    text = it,
+                    color = Color.Red,
+                    modifier = Modifier
+                        .padding(paddingValues)
+                        .fillMaxWidth()
+                )
+            }
+            PokemonContent(
+                pokemons = pokemonList,
+                paddingValues = paddingValues
+            ) {
+                viewModel.loadPokemonList()
+            }
         }
     )
 }
 
 @ExperimentalMaterial3Api
 @Composable
-fun PokemonContent(pokemons: SnapshotStateMap<String, PokemonDetail>, paddingValues: PaddingValues){
+fun PokemonContent(pokemons: List<Pair<String, PokemonDetail>>, paddingValues: PaddingValues, onLoadMore: () -> Unit){
     val sheetState = rememberModalBottomSheetState()
+    val lazyGridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     var showBottomSheet by remember { mutableStateOf(false) }
     var selectedPokemon by remember { mutableStateOf<Pair<String, PokemonDetail>?>(null) }
@@ -103,12 +135,13 @@ fun PokemonContent(pokemons: SnapshotStateMap<String, PokemonDetail>, paddingVal
         contentPadding = paddingValues,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        state = lazyGridState,
         modifier = Modifier
             .padding(top = 10.dp)
             .padding(horizontal = 10.dp)
 
     ){
-        items(pokemons.toList()) { pokemon ->
+        items(pokemons) { pokemon ->
             PokemonCard(
                 pokemon = pokemon,
                 cardModifier = Modifier
@@ -118,6 +151,21 @@ fun PokemonContent(pokemons: SnapshotStateMap<String, PokemonDetail>, paddingVal
                 showBottomSheet = isShowBottomSheet
                 selectedPokemon = pokemon
             }
+        }
+    }
+
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val lastVisibleItem = lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()
+            val totalItems = lazyGridState.layoutInfo.totalItemsCount
+            lastVisibleItem != null && lastVisibleItem.index >= totalItems - 15
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore.value) {
+        if(shouldLoadMore.value){
+            onLoadMore()
+            Log.e("ShouldLoadMore", "${shouldLoadMore.value}")
         }
     }
 
@@ -214,13 +262,12 @@ fun PokemonDetailCard(pokemon: Pair<String, PokemonDetail>){
                 style = MaterialTheme.typography.headlineSmall
             )
             Spacer(Modifier.height(8.dp))
-            Text("Weight: ${detail.weight}")
-            Text("Height: ${detail.height}")
-            detail.types.forEach{
-                Text("Type: ${it.type.name}")
-            }
+            Text("Weight: ${detail.weight / 10.00} kg")
+            Text("Height: ${detail.height / 10.00} m")
+            val types = detail.types.joinToString("/") { it.type.name }
+            Text("Type: $types")
             detail.stats.forEach {
-                Text("Type: ${it.stat.name}")
+                Text("${it.stat.name}: ${it.baseStat}")
             }
         }
     }
