@@ -29,6 +29,9 @@ class MainViewModel @Inject constructor(
     var pokemonList = mutableStateListOf<Pair<String, PokemonDetail>>()
         private set
 
+    var strongestPokemon = mutableStateOf<Pair<String, PokemonDetail>?>(null)
+        private set
+
     var errorMessage = mutableStateOf<String?>(null)
         private set
 
@@ -48,6 +51,8 @@ class MainViewModel @Inject constructor(
                         item.name to detail
                     }
                 }.awaitAll()
+                errorMessage.value = null
+                strongestPokemon.value = null
                 pokemonList.addAll(details)
 
                 currentOffset += limit
@@ -83,7 +88,9 @@ class MainViewModel @Inject constructor(
                         item.name to detail
                     }
                 }.awaitAll()
+                errorMessage.value = null
                 pokemonList.clear()
+                strongestPokemon.value = null
                 pokemonList.addAll(details)
 
                 currentOffset = (initialRandomOffset + limit)
@@ -95,6 +102,32 @@ class MainViewModel @Inject constructor(
                 isLoading = false
             }
         }
+    }
 
+    fun findStrongestPokemon(
+        list: List<Pair<String, PokemonDetail>>,
+        useAttack: Boolean = false,
+        useDefense: Boolean = false,
+        useHP: Boolean = false
+    ){
+        if (!useAttack && !useDefense && !useHP) return
+
+         val strongest = list.maxByOrNull { (_, detail) ->
+            var score = 0
+            detail.stats.forEach{
+                when (it.stat.name){
+                    "attack" -> if(useAttack) score += it.baseStat
+                    "defense" -> if (useDefense) score += it.baseStat
+                    "hp" -> if (useHP) score += it.baseStat
+                }
+            }
+           score
+        }
+
+        strongest?.let {
+            strongestPokemon.value = strongest
+            pokemonList.remove(strongest)
+            pokemonList.add(0, strongest)
+        }
     }
 }
