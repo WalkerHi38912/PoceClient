@@ -1,8 +1,10 @@
 package com.example.pokeclient.ui
 
 import android.util.Log
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pokeclient.data.api.PokemonDetail
@@ -11,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import okio.IOException
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,7 +25,7 @@ class MainViewModel @Inject constructor(
     private val maxPokemonCount = 1302
     private var currentOffset = 0
     private val maxOffset = maxPokemonCount - limit
-    private var isLoading = false
+
     private var hasReachedTheEnd = false
     private var initialRandomOffset = 0
 
@@ -35,19 +38,33 @@ class MainViewModel @Inject constructor(
     var errorMessage = mutableStateOf<String?>(null)
         private set
 
+    var isLoading = mutableStateOf(false)
+        private set
+
+    var firstLoading = mutableStateOf(false)
+        private set
+
+    var randomLoading = mutableStateOf(false)
+        private set
+
+    init {
+        loadPokemonList()
+        firstLoading.value = true
+    }
+
     fun loadPokemonList(){
         if(hasReachedTheEnd && currentOffset >= initialRandomOffset) return
-        if(isLoading) return
+        if(isLoading.value) return
 
-        isLoading = true
+        isLoading.value = true
 
         viewModelScope.launch {
             try {
-                val list = repository.getPokemonList(limit, currentOffset)
+                val list = repository.getRemotePokemonList(limit, currentOffset)
                 Log.e("PokemonList", "$list")
                 val details = list.map { item ->
                     async {
-                        val detail = repository.getPokemonDetail(item.name)
+                        val detail = repository.getRemotePokemonDetail(item.name)
                         item.name to detail
                     }
                 }.awaitAll()
@@ -62,11 +79,12 @@ class MainViewModel @Inject constructor(
                     hasReachedTheEnd = true
                 }
 
-            } catch (e: Exception){
-                errorMessage.value = "Не удалось загрузить покемонов. Проверьте соединение."
+            } catch (e: java.io.IOException){
+                errorMessage.value = "Check network connection!"
                 Log.e("loadPokemonList", "Не удалось загрузить покемонов. Проверьте соединение.")
             } finally {
-                isLoading = false
+                isLoading.value = false
+                firstLoading.value = false
             }
         }
     }
@@ -74,32 +92,34 @@ class MainViewModel @Inject constructor(
     fun loadRandomPokemonList(){
         hasReachedTheEnd = false
         initialRandomOffset = (0..maxOffset).random()
+        errorMessage.value = null
 
-        if(isLoading) return
-        isLoading = true
+        if(isLoading.value) return
+        isLoading.value = true
+        randomLoading.value = true
 
         viewModelScope.launch {
             try {
-                val list = repository.getPokemonList(limit, initialRandomOffset)
+                val list = repository.getRemotePokemonList(limit, initialRandomOffset)
                 Log.e("RandomPokemonList", "$list")
                 val details = list.map { item ->
                     async {
-                        val detail = repository.getPokemonDetail(item.name)
+                        val detail = repository.getRemotePokemonDetail(item.name)
                         item.name to detail
                     }
                 }.awaitAll()
-                errorMessage.value = null
                 pokemonList.clear()
                 strongestPokemon.value = null
                 pokemonList.addAll(details)
 
                 currentOffset = (initialRandomOffset + limit)
                 Log.e("CurrentOffset", "$currentOffset")
-            }catch (e: Exception){
-                errorMessage.value = "Не удалось загрузить покемонов. Проверьте соединение."
+            }catch (e: java.io.IOException){
+                errorMessage.value = "Check network connection!"
                 Log.e("loadRandomPokemonList", "Не удалось загрузить покемонов. Проверьте соединение.")
             } finally {
-                isLoading = false
+                isLoading.value = false
+                randomLoading.value = false
             }
         }
     }
